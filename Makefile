@@ -2,14 +2,24 @@ MAIN_SOURCES := $(shell find src/main/java -name '*.java' -print)
 TEST_SOURCES := $(shell find src/test/java -name '*.java' -print)
 MAIN_CLASS := dev.datnguyen.missionscheduler.MissionScheduler
 
-.PHONY: build compile test clean
+.PHONY: build app compile test clean
 
 build: compile
 	jar --create --file build/mission-scheduler.jar --main-class $(MAIN_CLASS) -C build/classes .
 
+app: build
+	rm -rf build/app build/jpackage-input
+	mkdir -p build/app build/jpackage-input
+	cp build/mission-scheduler.jar build/jpackage-input/
+	jpackage --type app-image --name "Mission Scheduler" --dest build/app \
+		--input build/jpackage-input --main-jar mission-scheduler.jar \
+		--main-class $(MAIN_CLASS) --app-version 1.0.0 --vendor "Dat Nguyen" \
+		--description "Dependency planning and critical-path simulation"
+
 compile:
 	mkdir -p build/classes
 	javac --release 21 -Xlint:all -Werror -d build/classes $(MAIN_SOURCES)
+	cp -R src/main/resources/. build/classes/
 
 test: compile
 	mkdir -p build/test-classes

@@ -1,5 +1,6 @@
 package dev.datnguyen.missionscheduler;
 
+import dev.datnguyen.missionscheduler.app.MissionSchedulerApp;
 import dev.datnguyen.missionscheduler.io.MissionParser;
 import dev.datnguyen.missionscheduler.model.Mission;
 import dev.datnguyen.missionscheduler.planning.MissionPlan;
@@ -23,7 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 public final class MissionScheduler {
-    private static final String VERSION = "0.1.0";
+    private static final String VERSION = "1.0.0";
 
     private final PrintStream output;
     private final PrintStream errorOutput;
@@ -42,14 +43,14 @@ public final class MissionScheduler {
 
     int run(String[] args) {
         if (args.length == 0) {
-            printUsage(errorOutput);
-            return 2;
+            args = new String[]{"app"};
         }
 
         String commandName = args[0];
         String[] commandArgs = Arrays.copyOfRange(args, 1, args.length);
         try {
             return switch (commandName) {
+                case "app" -> runApp(commandArgs);
                 case "validate" -> runValidate(commandArgs);
                 case "plan" -> runPlan(commandArgs);
                 case "simulate" -> runSimulate(commandArgs);
@@ -81,6 +82,16 @@ public final class MissionScheduler {
             errorOutput.printf("%s: %s%n", commandName, exception.getMessage());
             return 1;
         }
+    }
+
+    private int runApp(String[] args) {
+        ParsedCommand command = ParsedCommand.parse(args, Set.of(), Set.of("help"));
+        if (command.hasFlag("help")) {
+            printAppUsage(output);
+            return 0;
+        }
+        MissionSchedulerApp.launch(command.optionalPath());
+        return 0;
     }
 
     private int runValidate(String[] args) throws IOException {
@@ -286,15 +297,25 @@ public final class MissionScheduler {
                 mission-scheduler - validate, plan, and simulate dependency-aware operations
 
                 Usage:
+                  mission-scheduler
+                  mission-scheduler app [MISSION_FILE]
                   mission-scheduler COMMAND MISSION_FILE [options]
 
                 Commands:
+                  app       Launch the desktop application (default)
                   validate  Check syntax, references, and dependency cycles
                   plan      Compute parallel timing, slack, and critical tasks
                   simulate  Execute the dependency graph using virtual threads
                   version   Print the version
 
                 Run "mission-scheduler COMMAND --help" for command-specific help.""");
+    }
+
+    private static void printAppUsage(PrintStream stream) {
+        stream.println("""
+                Usage: mission-scheduler app [MISSION_FILE]
+
+                Launch the desktop application. With no mission file, the bundled demo opens.""");
     }
 
     private static void printValidateUsage(PrintStream stream) {
@@ -382,6 +403,13 @@ public final class MissionScheduler {
                 throw new IllegalArgumentException("exactly one mission file is required");
             }
             return Path.of(positionals.getFirst());
+        }
+
+        Path optionalPath() {
+            if (positionals.size() > 1) {
+                throw new IllegalArgumentException("at most one mission file may be opened");
+            }
+            return positionals.isEmpty() ? null : Path.of(positionals.getFirst());
         }
     }
 }

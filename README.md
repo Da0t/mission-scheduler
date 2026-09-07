@@ -1,6 +1,6 @@
 # mission-scheduler
 
-`mission-scheduler` is an independent Java 21 CLI for validating, planning, and simulating dependency-aware operations. It is deliberately a separate problem and codebase from the Go networking project.
+`mission-scheduler` is an independent Java 21 desktop application for designing, validating, planning, and simulating dependency-aware operations. A CLI remains available for automation, but the graphical application is the primary experience. It is deliberately a separate problem and codebase from the Go networking project.
 
 The example domain is a fictional launch sequence, but the underlying ideas apply to build systems, workflow engines, job schedulers, and project planning. This educational project is not affiliated with or based on internal systems from SpaceX or any other launch provider.
 
@@ -12,8 +12,9 @@ The example domain is a fictional launch sequence, but the underlying ideas appl
 - Latest start and slack calculations.
 - Critical-path analysis.
 - Dependency-aware parallel execution with Java virtual threads.
+- Swing desktop UI with mission loading, critical-task highlighting, task details, and a live event console.
 - Immutable records, clear domain boundaries, and zero third-party dependencies.
-- Human-readable and JSON CLI output.
+- Optional human-readable and JSON CLI output.
 
 ## Requirements
 
@@ -28,11 +29,36 @@ Maven and Gradle are not required.
 cd /Users/datnguyen/Desktop/Projects/mission-scheduler
 make test
 make build
+make app
 ```
 
-The executable JAR is generated at `build/mission-scheduler.jar`. The launcher recompiles changed sources automatically.
+The executable JAR is generated at `build/mission-scheduler.jar`. `make app` additionally creates the native macOS bundle at `build/app/Mission Scheduler.app`. The launcher recompiles changed sources and bundles the demo mission automatically.
 
-## Try it
+## Launch the application
+
+```bash
+./mission-scheduler
+```
+
+After running `make app`, you can also open `build/app/Mission Scheduler.app` from Finder like a normal macOS application.
+
+The application opens with a bundled demo mission. From the UI you can:
+
+- Open another `.mission` file.
+- Inspect earliest and latest task timing.
+- See critical tasks highlighted before execution.
+- Select a row for dependency and slack details.
+- Choose a simulation speed.
+- Run or stop the dependency-aware simulation.
+- Watch task states and events update live.
+
+You can also open a mission directly:
+
+```bash
+./mission-scheduler app examples/demo.mission
+```
+
+## Optional CLI
 
 Validate the included mission:
 
@@ -86,6 +112,8 @@ The planner rejects duplicate task IDs, missing dependencies, self-dependencies,
 5. Compute `slack = latest start - earliest start`.
 6. Mark zero-slack tasks as critical.
 7. During simulation, represent every task with a `CompletableFuture`; each future starts only after all dependency futures complete.
+
+The desktop layer calls the same parser, planner, and simulator as the CLI. It does not duplicate scheduling logic, which keeps the domain engine independently testable.
 
 ## Useful interview discussion
 

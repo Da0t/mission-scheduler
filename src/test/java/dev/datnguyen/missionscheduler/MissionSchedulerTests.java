@@ -1,5 +1,6 @@
 package dev.datnguyen.missionscheduler;
 
+import dev.datnguyen.missionscheduler.app.MissionTableModel;
 import dev.datnguyen.missionscheduler.io.MissionParser;
 import dev.datnguyen.missionscheduler.model.Mission;
 import dev.datnguyen.missionscheduler.model.MissionTask;
@@ -23,6 +24,7 @@ public final class MissionSchedulerTests {
         run("missing dependency", MissionSchedulerTests::testMissingDependency);
         run("cycle detection", MissionSchedulerTests::testCycleDetection);
         run("dependency-aware simulation", MissionSchedulerTests::testSimulationOrdering);
+        run("desktop table state", MissionSchedulerTests::testDesktopTableState);
         System.out.printf("%n%d tests passed%n", passed);
     }
 
@@ -72,6 +74,28 @@ public final class MissionSchedulerTests {
         long alphaCompleted = sequenceOf(observed, "alpha", SimulationEvent.Kind.COMPLETED);
         long bravoStarted = sequenceOf(observed, "bravo", SimulationEvent.Kind.STARTED);
         check(alphaCompleted < bravoStarted, "bravo started before alpha completed");
+    }
+
+    private static void testDesktopTableState() {
+        Mission mission = new Mission(List.of(
+                new MissionTask("alpha", 20, List.of(), "Alpha")));
+        MissionPlan plan = new MissionPlanner().plan(mission);
+        MissionTableModel model = new MissionTableModel();
+        model.setPlan(plan);
+
+        check(model.getRowCount() == 1, "table should contain one task");
+        check(model.stateAt(0) == MissionTableModel.TaskState.PENDING,
+                "task should initially be pending");
+
+        model.applyEvent(new SimulationEvent(
+                1, SimulationEvent.Kind.STARTED, "alpha", "Alpha", 1));
+        check(model.stateAt(0) == MissionTableModel.TaskState.RUNNING,
+                "started task should be running");
+
+        model.applyEvent(new SimulationEvent(
+                2, SimulationEvent.Kind.COMPLETED, "alpha", "Alpha", 2));
+        check(model.stateAt(0) == MissionTableModel.TaskState.COMPLETE,
+                "completed task should be complete");
     }
 
     private static long sequenceOf(

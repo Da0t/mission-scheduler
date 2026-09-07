@@ -1,0 +1,8 @@
+# id|duration_ms|dependencies|description
+load_weather|1200||Load weather and range constraints
+power_avionics|900||Power flight computers and avionics
+verify_links|1100|power_avionics|Verify command and telemetry links
+compute_window|700|load_weather|Compute the candidate launch window
+go_no_go|600|verify_links,compute_window|Run the final go/no-go poll
+arm_sequence|500|go_no_go|Arm the automated launch sequence
+launch|200|arm_sequence|Commit the simulated launch command
