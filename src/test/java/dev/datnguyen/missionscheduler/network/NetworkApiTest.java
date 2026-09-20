@@ -13,7 +13,7 @@ class NetworkApiTest {
     @Autowired TestRestTemplate http;
     @Test void servesDashboardPlanAndValidatedControls() {
         var page = http.getForEntity("/", String.class);
-        assertEquals(HttpStatus.OK, page.getStatusCode()); assertTrue(page.getBody().contains("Follow the signal"));
+        assertEquals(HttpStatus.OK, page.getStatusCode()); assertTrue(page.getBody().contains("Make every window count"));
         assertEquals(HttpStatus.OK, http.getForEntity("/api/plan", String.class).getStatusCode());
         assertEquals(HttpStatus.OK, http.postForEntity("/api/start", null, String.class).getStatusCode());
         assertEquals(HttpStatus.OK, http.postForEntity("/api/pause", null, String.class).getStatusCode());
