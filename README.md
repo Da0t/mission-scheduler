@@ -1,125 +1,57 @@
-# mission-scheduler
+# Mission Network Lab
 
-`mission-scheduler` is an independent Java 21 desktop application for designing, validating, planning, and simulating dependency-aware operations. A CLI remains available for automation, but the graphical application is the primary experience. It is deliberately a separate problem and codebase from the Go networking project.
+A Java 21 + Spring Boot browser application for exploring UDP telemetry, network availability, delay, loss, and failover. This evolves the original mission scheduler into an interactive networking project. All experiment controls live in the browser.
 
-The example domain is a fictional launch sequence, but the underlying ideas apply to build systems, workflow engines, job schedulers, and project planning. This educational project is not affiliated with or based on internal systems from SpaceX or any other launch provider.
+## Start
 
-## What it demonstrates
+Install JDK 21 or newer. Double-click **Mission Network Lab.command** on macOS, or run `./mission-scheduler`, then open http://127.0.0.1:8080. The macOS launcher uses the packaged JAR when available and opens the browser once the server responds. Without a packaged JAR, the first launch downloads Maven and dependencies and may take a few minutes. Run `./mvnw package` after source changes to refresh the packaged app. Stop the server with Ctrl+C in its launcher terminal.
 
-- Directed acyclic graphs and deterministic topological sorting.
-- Missing-reference and dependency-cycle detection.
-- Earliest start/finish calculations.
-- Latest start and slack calculations.
-- Critical-path analysis.
-- Dependency-aware parallel execution with Java virtual threads.
-- Swing desktop UI with mission loading, critical-task highlighting, task details, and a live event console.
-- Immutable records, clear domain boundaries, and zero third-party dependencies.
-- Optional human-readable and JSON CLI output.
+No globally installed Maven, Node, or database is required. `./mvnw test` runs tests; `./mvnw package` creates `target/mission-scheduler-2.0.0.jar`. Run it with `java -jar target/mission-scheduler-2.0.0.jar`. `PORT=8081 ./mission-scheduler` selects a different HTTP port (open that port yourself).
 
-## Requirements
+## Try this experiment
 
-- JDK 21 or newer.
-- `make` for the convenience targets and launcher.
+1. Start the stream. Watch four datagrams per second arrive at the ground station.
+2. Disable Relay Alpha. The backup route adds 75 ms of modeled base latency.
+3. Add 200 ms delay. Watch the received-packet chart rise; the lifetime average changes more slowly.
+4. Add 30% loss. UDP packets disappear without retries; delivery rate declines over time.
+5. Disable both relays. New packets drop. Restore one relay to resume delivery.
+6. Pause to drain in-flight packets, then export the JSON snapshot. Reset for a fresh comparison.
 
-Maven and Gradle are not required.
+## What is real, and what is modeled?
 
-## Build and test
+**Real:** two loopback UDP sockets, 16-byte binary datagrams, monotonic timing, sequence IDs, HTTP requests to Spring Boot, validation, bounded event/sample buffers, and automated integration tests.
 
-```bash
-cd /Users/datnguyen/Desktop/Projects/mission-scheduler
-make test
-make build
-make app
-```
+**Modeled:** the diagram's intermediate relays, preferred/backup route selection, base delay, random jitter (0–15 ms), and probabilistic loss. This is a two-path availability model, not a routing-protocol implementation. It does not create separate relay processes or alter the operating system's network routes. Synthetic loss happens before the UDP send. Existing in-flight packets retain the route delay selected at emission. Browser animation indicates an active stream, not individual measured packets.
 
-The executable JAR is generated at `build/mission-scheduler.jar`. `make app` additionally creates the native macOS bundle at `build/app/Mission Scheduler.app`. The launcher recompiles changed sources and bundles the demo mission automatically.
+The backend admits four packets per second. Scheduled packets wait in a priority queue before a real UDP send; the nonblocking receiver measures arrival. A 10 ms scheduling loop adds timing granularity, so this is not a real-time benchmark. The PRNG is seeded for repeatable injection decisions, but wall-clock timing is not deterministic.
 
-## Launch the application
+Delivery rate = received / (received + dropped); in-flight packets are excluded. Jitter = mean absolute difference between consecutive received packet latencies. Latency includes modeled waiting and local processing. A two-second timeout resolves datagrams not observed at the receiver. The chart contains the last 80 received packets; export contains the current counters, those samples, and the last 100 events, not an unlimited packet capture.
 
-```bash
-./mission-scheduler
-```
+## Architecture
 
-After running `make app`, you can also open `build/app/Mission Scheduler.app` from Finder like a normal macOS application.
+Browser UI → Spring MVC REST controller → synchronized network lab → DatagramChannel sender/receiver.
 
-The application opens with a bundled demo mission. From the UI you can:
+The frontend is lightweight HTML/CSS/JavaScript served by Spring Boot. It polls `/api/state` every 500 ms. Spring Boot supplies HTTP routing, JSON serialization, dependency injection, scheduling, and application lifecycle. The UDP worker uses nonblocking channels; virtual threads are enabled for supported Spring Boot execution, but they do not make this polling worker parallel.
 
-- Open another `.mission` file.
-- Inspect earliest and latest task timing.
-- See critical tasks highlighted before execution.
-- Select a row for dependency and slack details.
-- Choose a simulation speed.
-- Run or stop the dependency-aware simulation.
-- Watch task states and events update live.
+The original parser, dependency graph, critical-path planner, Swing UI source, and simulator remain available for study. `/api/plan` exposes a small plan through the original engine. That engine is not yet connected to network conditions; the dashboard focuses on the network lab. The default launcher now opens the web application, and `make app` starts the server. Previously generated Swing app bundles are legacy build artifacts.
 
-You can also open a mission directly:
+## API
 
-```bash
-./mission-scheduler app examples/demo.mission
-```
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/state` | Counters, recent arrivals, event log, controls |
+| POST | `/api/start` | Start/idempotently continue stream |
+| POST | `/api/pause` | Stop admitting packets; drain in-flight work |
+| POST | `/api/reset` | Pause and clear the shared session |
+| PUT | `/api/controls` | Set primaryUp, backupUp, delayMs (0–400), lossPercent (0–50) |
+| GET | `/api/plan` | Example critical-path plan from the original scheduler |
 
-## Optional CLI
+One in-memory session is shared by browser tabs. The server binds to 127.0.0.1 and has no authentication; this version is intended for local use. Session counters disappear on restart.
 
-Validate the included mission:
+## Engineering checks
 
-```bash
-./mission-scheduler validate examples/demo.mission
-```
+Tests exercise actual socket delivery, pause/drain behavior, loss on complete outage, backup recovery, accounting invariants, reset, bounds validation, HTTP/UI availability, and the five original scheduling regressions. GitHub Actions is configured to run Maven verification on Java 21/Linux; a hosted CI run is only available after pushing the repository.
 
-Display its schedule and critical tasks:
+Read [the learning guide](docs/LEARNING.md) for Java benefits, networking concepts, exercises, and the next steps toward a stronger portfolio project.
 
-```bash
-./mission-scheduler plan examples/demo.mission
-```
-
-Run a time-compressed simulation using virtual threads:
-
-```bash
-./mission-scheduler simulate examples/demo.mission --speed 100
-```
-
-Request machine-readable output:
-
-```bash
-./mission-scheduler plan examples/demo.mission --json
-./mission-scheduler simulate examples/demo.mission --speed 100 --json
-```
-
-## Mission file format
-
-Mission files use four pipe-separated fields:
-
-```text
-id|duration_ms|comma_separated_dependencies|description
-```
-
-Blank lines and lines beginning with `#` are ignored. Dependencies may refer to tasks declared later in the file.
-
-```text
-power|900||Power avionics
-verify|1100|power|Verify communication links
-poll|600|verify,weather|Run the go/no-go poll
-```
-
-The planner rejects duplicate task IDs, missing dependencies, self-dependencies, malformed durations, and cycles.
-
-## Core algorithm
-
-1. Build an adjacency list and dependency count for each task.
-2. Use Kahn's algorithm to produce a deterministic topological order.
-3. Walk forward to calculate earliest start and finish times.
-4. Walk backward to calculate latest start times.
-5. Compute `slack = latest start - earliest start`.
-6. Mark zero-slack tasks as critical.
-7. During simulation, represent every task with a `CompletableFuture`; each future starts only after all dependency futures complete.
-
-The desktop layer calls the same parser, planner, and simulator as the CLI. It does not duplicate scheduling logic, which keeps the domain engine independently testable.
-
-## Useful interview discussion
-
-- Why a cycle makes the plan impossible to schedule.
-- Why topological order can be valid without being unique.
-- How critical-path duration differs from the sum of all task durations.
-- Why virtual threads make blocking tasks cheap but do not remove the need for dependency control.
-- How failures, cancellation, retries, deadlines, and resource limits could extend the simulator.
-- How to persist event history without letting logging become a scheduling bottleneck.
+Independent educational project; no affiliation with Lockheed Martin or any operational mission system.

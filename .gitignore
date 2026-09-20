@@ -1,4 +1,3 @@
-/build/
-/.idea/
-*.iml
+build/
+target/
 .DS_Store
